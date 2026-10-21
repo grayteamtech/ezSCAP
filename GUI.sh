@@ -72,23 +72,21 @@ elif [[ "$MODE_CHOICE" != "1" ]]; then
     exit 1
 fi
 
-# 4. Path Setup & Execution with Progress Dialog
+# 4. Path Setup & Real-time Live Progress Execution
 XML_PATH=$(zenity --entry --title="Results Path" --text="Enter XML results file path:" --entry-text="/var/log/scan-results.xml")
 [[ -z "$XML_PATH" ]] && exit 0
 mkdir -p "$(dirname "$XML_PATH")"
 
-# Run scan in background with a pulsating progress indicator
-(
-    echo "50"; echo "# Running $BENCHMARK_NAME scan..."
-) | zenity --progress --title="OpenSCAP Scanner" --text="Executing scan..." --pulsate --auto-close &
-PROG_PID=$!
-
 set +e
-oscap xccdf eval $REMEDIATE_FLAG --profile "$PROFILE_ID" --results "$XML_PATH" "$SSG_FILE" &>/dev/null
-SCAN_EXIT_CODE=$?
+# Stream oscap output into Zenity progress bar so it displays live status updates
+(
+    oscap xccdf eval $REMEDIATE_FLAG --profile "$PROFILE_ID" --results "$XML_PATH" "$SSG_FILE" 2>&1 | while IFS= read -r line; do
+        # Lines prefixed with '#' update Zenity's progress text label
+        echo "# $line"
+    done
+) | zenity --progress --title="OpenSCAP Scanner" --text="Initializing $BENCHMARK_NAME scan..." --pulsate --auto-close --width=550 --height=160
+SCAN_EXIT_CODE=${PIPESTATUS[0]}
 set -e
-
-kill "$PROG_PID" 2>/dev/null || true
 
 if [[ $SCAN_EXIT_CODE -eq 0 || $SCAN_EXIT_CODE -eq 2 ]]; then
     zenity --info --title="Scan Complete" --text="Scan finished successfully.\nResults saved to: $XML_PATH"
