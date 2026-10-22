@@ -76,8 +76,8 @@ mkdir -p "$(dirname "$XML_PATH")"
 
 # Run scan in background with a pulsating progress indicator
 (
-   echo "50"; echo "# Running $BENCHMARK_NAME scan..."
-) | zenity --progress --title="OpenSCAP Scanner" --text="Executing scan..." --pulsate --auto-close &
+   echo "50"; echo "# Scanning..."
+) | zenity --progress --title="OpenSCAP Scanner" --text="Scanning..." --pulsate --auto-close &
 PROG_PID=$!
 
 set +e
