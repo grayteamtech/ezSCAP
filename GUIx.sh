@@ -74,10 +74,10 @@ XML_PATH=$(zenity --entry --title="Results Path" --text="Enter XML results file 
 [[ -z "$XML_PATH" ]] && exit 0
 mkdir -p "$(dirname "$XML_PATH")"
 
-# Run scan in background with a pulsating progress indicator
+# Run scan in background with a pulsating progress indicator and title "Scanning..."
 (
    echo "50"; echo "# Scanning..."
-) | zenity --progress --title="OpenSCAP Scanner" --text="Scanning..." --pulsate --auto-close &
+) | zenity --progress --title="Scanning..." --text="Scanning..." --pulsate --auto-close &
 PROG_PID=$!
 
 set +e
