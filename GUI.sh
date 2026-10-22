@@ -1,4 +1,4 @@
-Please edit the following code to make the style of the GUI a modern gray hacker color with green font and have the title of each GUI display saying ezSCAP: #!/usr/bin/env bash
+#!/usr/bin/env bash
 set -euo pipefail
 
 # 1. Root, Dependency, & Zenity Checks
