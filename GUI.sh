@@ -1,14 +1,56 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Setup modern gray hacker theme with green font for Zenity/GTK3
+GTK_THEME_DIR="/tmp/ezscap-gtk/share/themes/ezscap-dark/gtk-3.0"
+mkdir -p "$GTK_THEME_DIR"
+cat << 'EOF' > "$GTK_THEME_DIR/gtk.css"
+@define-color bg_color #1a1a1a;
+@define-color fg_color #00ff00;
+@define-color base_color #121212;
+@define-color text_color #00ff00;
+@define-color selected_bg_color #003300;
+@define-color selected_fg_color #00ff00;
+
+window {
+    background-color: #1a1a1a;
+    color: #00ff00;
+}
+
+label, textview, entry, button, list, treeview, checkbutton {
+    color: #00ff00;
+    background-color: #1a1a1a;
+}
+
+entry, textview text {
+    background-color: #121212;
+    color: #00ff00;
+    border: 1px solid #00ff00;
+}
+
+button {
+    background-color: #262626;
+    color: #00ff00;
+    border: 1px solid #00ff00;
+}
+
+button:hover {
+    background-color: #003300;
+    color: #00ff00;
+}
+EOF
+
+export GTK_DATA_PREFIX="/tmp/ezscap-gtk"
+export GTK_THEME="ezscap-dark"
+
 # 1. Root, Dependency, & Zenity Checks
 if [[ $EUID -ne 0 ]]; then
-    zenity --error --title="Error" --text="This script must be run as root."
+    zenity --error --title="ezSCAP" --text="This script must be run as root."
     exit 1
 fi
 
 if ! command -v oscap &>/dev/null; then
-    zenity --error --title="Error" --text="'oscap' missing.\nRun: dnf install openscap-scanner scap-security-guide"
+    zenity --error --title="ezSCAP" --text="'oscap' missing.\nRun: dnf install openscap-scanner scap-security-guide"
     exit 1
 fi
 
@@ -19,12 +61,12 @@ fi
 
 SSG_FILE="/usr/share/xml/scap/ssg/content/ssg-rhel9-ds.xml"
 if [[ ! -f "$SSG_FILE" ]]; then
-    zenity --error --title="Error" --text="Data stream missing at:\n$SSG_FILE"
+    zenity --error --title="ezSCAP" --text="Data stream missing at:\n$SSG_FILE"
     exit 1
 fi
 
 # 2. Benchmark Selection via GUI Radio List
-BENCHMARK_CHOICE=$(zenity --list --title="OpenSCAP Scanner" \
+BENCHMARK_CHOICE=$(zenity --list --title="ezSCAP" \
     --text="Select security benchmark:" \
     --column="Select" --column="ID" --column="Benchmark Name" \
     --radiolist TRUE "1" "DISA STIG" \
@@ -44,15 +86,15 @@ case "$BENCHMARK_CHOICE" in
     3) PROFILE_ID="xccdf_org.ssgproject.content_profile_cis"; BENCHMARK_NAME="CIS" ;;
     4) PROFILE_ID="xccdf_org.ssgproject.content_profile_pci-dss"; BENCHMARK_NAME="PCI-DSS" ;;
     5) 
-        PROFILE_ID=$(zenity --entry --title="Custom Profile" --text="Enter full Profile ID:" --entry-text="xccdf_org.ssgproject.content_profile_")
+        PROFILE_ID=$(zenity --entry --title="ezSCAP" --text="Enter full Profile ID:" --entry-text="xccdf_org.ssgproject.content_profile_")
         [[ -z "$PROFILE_ID" ]] && exit 0
         BENCHMARK_NAME="Custom"
         ;;
-    *) zenity --error --title="Error" --text="Invalid choice."; exit 1 ;;
+    *) zenity --error --title="ezSCAP" --text="Invalid choice."; exit 1 ;;
 esac
 
 # 3. Scan Mode Selection
-MODE_CHOICE=$(zenity --list --title="Scan Mode" \
+MODE_CHOICE=$(zenity --list --title="ezSCAP" \
     --text="Select scan execution mode:" \
     --column="Select" --column="ID" --column="Mode Description" \
     --radiolist TRUE "1" "Regular Scan (Audit only)" \
@@ -66,14 +108,14 @@ fi
 REMEDIATE_FLAG=""
 if [[ "$MODE_CHOICE" == "2" ]]; then
     REMEDIATE_FLAG="--remediate"
-    zenity --warning --title="Warning" --text="Remediation mode is enabled and will modify system configurations."
+    zenity --warning --title="ezSCAP" --text="Remediation mode is enabled and will modify system configurations."
 elif [[ "$MODE_CHOICE" != "1" ]]; then
-    zenity --error --title="Error" --text="Invalid mode choice."
+    zenity --error --title="ezSCAP" --text="Invalid mode choice."
     exit 1
 fi
 
 # 4. Path Setup & Real-time Live Progress Execution
-XML_PATH=$(zenity --entry --title="Results Path" --text="Enter XML results file path:" --entry-text="/var/log/scan-results.xml")
+XML_PATH=$(zenity --entry --title="ezSCAP" --text="Enter XML results file path:" --entry-text="/var/log/scan-results.xml")
 [[ -z "$XML_PATH" ]] && exit 0
 mkdir -p "$(dirname "$XML_PATH")"
 
@@ -84,26 +126,26 @@ set +e
         # Lines prefixed with '#' update Zenity's progress text label
         echo "# $line"
     done
-) | zenity --progress --title="OpenSCAP Scanner" --text="Initializing $BENCHMARK_NAME scan..." --pulsate --auto-close --width=550 --height=160
+) | zenity --progress --title="ezSCAP" --text="Initializing $BENCHMARK_NAME scan..." --pulsate --auto-close --width=550 --height=160
 SCAN_EXIT_CODE=${PIPESTATUS[0]}
 set -e
 
 if [[ $SCAN_EXIT_CODE -eq 0 || $SCAN_EXIT_CODE -eq 2 ]]; then
-    zenity --info --title="Scan Complete" --text="Scan finished successfully.\nResults saved to: $XML_PATH"
+    zenity --info --title="ezSCAP" --text="Scan finished successfully.\nResults saved to: $XML_PATH"
 else
-    zenity --error --title="Scan Error" --text="Scan failed with exit code $SCAN_EXIT_CODE."
+    zenity --error --title="ezSCAP" --text="Scan failed with exit code $SCAN_EXIT_CODE."
     exit "$SCAN_EXIT_CODE"
 fi
 
 # 5. Optional HTML Report Generation
-if zenity --question --title="HTML Report" --text="Would you like to generate an HTML report?"; then
-    HTML_PATH=$(zenity --entry --title="HTML Report Path" --text="Enter HTML report file path:" --entry-text="/var/log/scan-report.html")
+if zenity --question --title="ezSCAP" --text="Would you like to generate an HTML report?"; then
+    HTML_PATH=$(zenity --entry --title="ezSCAP" --text="Enter HTML report file path:" --entry-text="/var/log/scan-report.html")
     if [[ -n "$HTML_PATH" ]]; then
         mkdir -p "$(dirname "$HTML_PATH")"
         if oscap xccdf generate report "$XML_PATH" > "$HTML_PATH"; then
-            zenity --info --title="Report Generated" --text="HTML report successfully generated:\n$HTML_PATH"
+            zenity --info --title="ezSCAP" --text="HTML report successfully generated:\n$HTML_PATH"
         else
-            zenity --error --title="Error" --text="Failed to generate HTML report."
+            zenity --error --title="ezSCAP" --text="Failed to generate HTML report."
         fi
     fi
 fi
@@ -153,4 +195,4 @@ EOF
 fi
 
 # Display Final Summary in a Scrollable Text Box
-zenity --text-info --title="Scan Results Summary" --filename=<(echo -e "$SUMMARY_TEXT") --width=500 --height=400
+zenity --text-info --title="ezSCAP" --filename=<(echo -e "$SUMMARY_TEXT") --width=500 --height=400
