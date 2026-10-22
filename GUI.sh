@@ -1,3 +1,4 @@
+Here is the updated script incorporating a modern dark gray hacker theme with vibrant green text, solid background styling, ezSCAP as the title across all GUI dialogs, dropdown menus for benchmark and mode selections, and updated progress bar text:
 #!/usr/bin/env bash
 set -euo pipefail
 
@@ -17,12 +18,12 @@ window {
     color: #00ff00;
 }
 
-label, textview, entry, button, list, treeview, checkbutton {
+label, textview, entry, button, list, treeview, checkbutton, combobox {
     color: #00ff00;
     background-color: #1a1a1a;
 }
 
-entry, textview text {
+entry, textview text, combobox window {
     background-color: #121212;
     color: #00ff00;
     border: 1px solid #00ff00;
@@ -65,27 +66,24 @@ if [[ ! -f "$SSG_FILE" ]]; then
     exit 1
 fi
 
-# 2. Benchmark Selection via GUI Radio List
-BENCHMARK_CHOICE=$(zenity --list --title="ezSCAP" \
+# 2. Benchmark Selection via Dropdown Menu
+BENCHMARK_CHOICE=$(zenity --forms --title="ezSCAP" \
     --text="Select security benchmark:" \
-    --column="Select" --column="ID" --column="Benchmark Name" \
-    --radiolist TRUE "1" "DISA STIG" \
-    FALSE "2" "HIPAA" \
-    FALSE "3" "CIS (L2)" \
-    FALSE "4" "PCI-DSS" \
-    FALSE "5" "Custom Profile" \
-    --width=450 --height=300 || echo "CANCELLED")
+    --add-combo="Benchmark" --combo-values="DISA STIG|HIPAA|CIS (L2)|PCI-DSS|Custom Profile" \
+    --width=450 --height=200 || echo "CANCELLED")
 
 if [[ "$BENCHMARK_CHOICE" == "CANCELLED" || -z "$BENCHMARK_CHOICE" ]]; then
     exit 0
 fi
 
+BENCHMARK_CHOICE=$(echo "$BENCHMARK_CHOICE" | tr -d '|')
+
 case "$BENCHMARK_CHOICE" in
-    1) PROFILE_ID="xccdf_org.ssgproject.content_profile_stig"; BENCHMARK_NAME="DISA STIG" ;;
-    2) PROFILE_ID="xccdf_org.ssgproject.content_profile_hipaa"; BENCHMARK_NAME="HIPAA" ;;
-    3) PROFILE_ID="xccdf_org.ssgproject.content_profile_cis"; BENCHMARK_NAME="CIS" ;;
-    4) PROFILE_ID="xccdf_org.ssgproject.content_profile_pci-dss"; BENCHMARK_NAME="PCI-DSS" ;;
-    5) 
+    "DISA STIG") PROFILE_ID="xccdf_org.ssgproject.content_profile_stig"; BENCHMARK_NAME="DISA STIG" ;;
+    "HIPAA") PROFILE_ID="xccdf_org.ssgproject.content_profile_hipaa"; BENCHMARK_NAME="HIPAA" ;;
+    "CIS (L2)") PROFILE_ID="xccdf_org.ssgproject.content_profile_cis"; BENCHMARK_NAME="CIS" ;;
+    "PCI-DSS") PROFILE_ID="xccdf_org.ssgproject.content_profile_pci-dss"; BENCHMARK_NAME="PCI-DSS" ;;
+    "Custom Profile") 
         PROFILE_ID=$(zenity --entry --title="ezSCAP" --text="Enter full Profile ID:" --entry-text="xccdf_org.ssgproject.content_profile_")
         [[ -z "$PROFILE_ID" ]] && exit 0
         BENCHMARK_NAME="Custom"
@@ -93,23 +91,23 @@ case "$BENCHMARK_CHOICE" in
     *) zenity --error --title="ezSCAP" --text="Invalid choice."; exit 1 ;;
 esac
 
-# 3. Scan Mode Selection
-MODE_CHOICE=$(zenity --list --title="ezSCAP" \
+# 3. Scan Mode Selection via Dropdown Menu
+MODE_CHOICE=$(zenity --forms --title="ezSCAP" \
     --text="Select scan execution mode:" \
-    --column="Select" --column="ID" --column="Mode Description" \
-    --radiolist TRUE "1" "Regular Scan (Audit only)" \
-    FALSE "2" "Remediation Scan (Audit AND auto-fix)" \
-    --width=450 --height=240 || echo "CANCELLED")
+    --add-combo="Scan Mode" --combo-values="Regular Scan (Audit only)|Remediation Scan (Audit AND auto-fix)" \
+    --width=450 --height=200 || echo "CANCELLED")
 
 if [[ "$MODE_CHOICE" == "CANCELLED" || -z "$MODE_CHOICE" ]]; then
     exit 0
 fi
 
+MODE_CHOICE=$(echo "$MODE_CHOICE" | tr -d '|')
+
 REMEDIATE_FLAG=""
-if [[ "$MODE_CHOICE" == "2" ]]; then
+if [[ "$MODE_CHOICE" == "Remediation Scan (Audit AND auto-fix)" ]]; then
     REMEDIATE_FLAG="--remediate"
     zenity --warning --title="ezSCAP" --text="Remediation mode is enabled and will modify system configurations."
-elif [[ "$MODE_CHOICE" != "1" ]]; then
+elif [[ "$MODE_CHOICE" != "Regular Scan (Audit only)" ]]; then
     zenity --error --title="ezSCAP" --text="Invalid mode choice."
     exit 1
 fi
@@ -126,7 +124,7 @@ set +e
         # Lines prefixed with '#' update Zenity's progress text label
         echo "# $line"
     done
-) | zenity --progress --title="ezSCAP" --text="Initializing $BENCHMARK_NAME scan..." --pulsate --auto-close --width=550 --height=160
+) | zenity --progress --title="ezSCAP" --text="Conducting Scan..." --pulsate --auto-close --width=550 --height=160
 SCAN_EXIT_CODE=${PIPESTATUS[0]}
 set -e
 
@@ -157,7 +155,7 @@ FIXED_COUNT=$(grep -c '<result>fixed</result>' "$XML_PATH" || true)
 
 # 7. Compile Summary Text
 SUMMARY_TEXT="Scan Summary ($BENCHMARK_NAME):\n\n• Passed: $PASSED_COUNT\n• Failed: $FAILED_COUNT"
-if [[ "$MODE_CHOICE" == "2" ]]; then
+if [[ "$MODE_CHOICE" == "Remediation Scan (Audit AND auto-fix)" ]]; then
     SUMMARY_TEXT+="\n• Fixed: $FIXED_COUNT"
 fi
 
@@ -196,3 +194,4 @@ fi
 
 # Display Final Summary in a Scrollable Text Box
 zenity --text-info --title="ezSCAP" --filename=<(echo -e "$SUMMARY_TEXT") --width=500 --height=400
+
